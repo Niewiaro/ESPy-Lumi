@@ -48,7 +48,7 @@ W celu uruchomienia projektu ESPy-Lumi na swoim systemie, wykonaj następujące 
 1. Sklonuj repozytorium na swoje urządzenie:
 
 ```
-git clone https://github.com/twoje-username/ESPy-Lumi.git
+git clone https://github.com/Niewiaro/ESPy-Lumi.git
 ```
 
 2. Przejdź do katalogu projektu:
