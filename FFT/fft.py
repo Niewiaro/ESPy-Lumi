@@ -1,6 +1,4 @@
 """
-https://github.com/markjay4k/Audio-Spectrum-Analyzer-in-Python/blob/master/spec_anim.py
-
 pip install pyAudio may not work
 Instead download and install a wheel from here:
 https://www.lfd.uci.edu/~gohlke/pythonlibs/#pyaudio
@@ -9,8 +7,6 @@ or use:
 
 pip install pipwin
 pipwin install pyaudio
-
-pipwin is like pip, but it installs precompiled Windows binaries provided by Christoph Gohlke.
 """
 
 # to display in separate Tk window
@@ -19,8 +15,6 @@ import matplotlib
 matplotlib.use("TkAgg")
 
 import pyaudio
-import os
-import struct
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import animation
@@ -29,95 +23,107 @@ import time
 from tkinter import TclError
 
 # Counts the frames
-# why the list? https://stackoverflow.com/questions/25040323/unable-to-reference-one-particular-variable-declared-outside-a-function
-count = [0]
+frame_count = 0
 
 # ------------ Audio Setup ---------------
-# constants
 CHUNK = 1024 * 2  # samples per frame
-FORMAT = pyaudio.paInt16  # audio format (bytes per sample?)
+FORMAT = pyaudio.paInt16  # audio format (16-bit integer)
 CHANNELS = 1  # single channel for microphone
 RATE = 44100  # samples per second
-# Signal range is -32k to 32k
-# limiting amplitude to +/- 4k
-AMPLITUDE_LIMIT = 4096
+AMPLITUDE_LIMIT = 2048  # limiting amplitude
 
-# pyaudio class instance
+# Initialize PyAudio
 p = pyaudio.PyAudio()
 
-# stream object to get data from microphone
-stream = p.open(
-    format=FORMAT,
-    channels=CHANNELS,
-    rate=RATE,
-    input=True,
-    output=True,
-    frames_per_buffer=CHUNK,
-)
+try:
+    # Open audio stream
+    stream = p.open(
+        format=FORMAT,
+        channels=CHANNELS,
+        rate=RATE,
+        input=True,
+        output=False,
+        frames_per_buffer=CHUNK,
+    )
+except Exception as e:
+    print(f"Error opening audio stream: {e}")
+    p.terminate()
+    exit()
 
 # ------------ Plot Setup ---------------
 fig, (ax1, ax2) = plt.subplots(2, figsize=(15, 7))
-# variable for plotting
 x = np.arange(0, 2 * CHUNK, 2)  # samples (waveform)
-xf = np.linspace(0, RATE, CHUNK)  # frequencies (spectrum)
+xf = np.linspace(0, RATE // 2, CHUNK // 2)  # frequencies (spectrum)
 
-# create a line object with random data
-(line,) = ax1.plot(x, np.random.rand(CHUNK), "-", lw=2)
+# Create line objects
+(line,) = ax1.plot(x, np.zeros(CHUNK), "-", lw=2)
+(line_fft,) = ax2.semilogx(xf, np.zeros(CHUNK // 2), "-", lw=2)
 
-# create semilogx line for spectrum, to plot the waveform as log not lin
-(line_fft,) = ax2.semilogx(xf, np.random.rand(CHUNK), "-", lw=2)
-
-# format waveform axes
-ax1.set_title("AUDIO WAVEFORM")
-ax1.set_xlabel("samples")
-ax1.set_ylabel("volume")
+# Format waveform axes
+ax1.set_title("Audio Waveform")
+ax1.set_xlabel("Samples")
+ax1.set_ylabel("Amplitude")
 ax1.set_ylim(-AMPLITUDE_LIMIT, AMPLITUDE_LIMIT)
 ax1.set_xlim(0, 2 * CHUNK)
-plt.setp(
-    ax1, xticks=[0, CHUNK, 2 * CHUNK], yticks=[-AMPLITUDE_LIMIT, 0, AMPLITUDE_LIMIT]
-)
 
-# format spectrum axes
-ax2.set_xlim(20, RATE / 2)
-print("stream started")
+# Format spectrum axes
+ax2.set_title("Frequency Spectrum")
+ax2.set_xlabel("Frequency (Hz)")
+ax2.set_ylabel("Magnitude")
+ax2.set_xlim(20, RATE // 2)
+ax2.set_ylim(0, AMPLITUDE_LIMIT)
+
+print("Stream started")
 
 
 def on_close(evt):
-    print("Closing")
-    # calculate average frame rate
-    frame_rate = count[0] / (time.time() - start_time)
+    """Handle figure close event."""
+    global frame_count, start_time
+    frame_rate = frame_count / (time.time() - start_time)
 
-    # Close the stream and terminate pyAudio
+    # Stop and close the audio stream
     stream.stop_stream()
     stream.close()
     p.terminate()
-    print("stream stopped")
-    print("average frame rate = {:.0f} FPS".format(frame_rate))
+
+    print("Stream stopped")
+    print(f"Average frame rate: {frame_rate:.2f} FPS")
     quit()
 
 
 def animate(i):
-    # binary data
-    data = stream.read(CHUNK)
-    # Open in numpy as a buffer
-    data_np = np.frombuffer(data, dtype="h")
+    """Update plot for animation."""
+    global frame_count
 
-    # Update the line graph
-    line.set_ydata(data_np)
+    try:
+        # Read audio data
+        data = stream.read(CHUNK, exception_on_overflow=False)
+        data_np = np.frombuffer(data, dtype=np.int16)
 
-    # compute FFT and update line
-    yf = fft(data_np)
-    # The fft will return complex numbers, so np.abs will return their magnitude
+        # Update waveform
+        line.set_ydata(data_np)
 
-    line_fft.set_ydata(np.abs(yf[0:CHUNK]) / (512 * CHUNK))
+        # Compute FFT and update spectrum
+        yf = fft(data_np)
+        magnitude = np.abs(yf[: CHUNK // 2]) / (CHUNK / 2)
+        line_fft.set_ydata(magnitude)
 
-    # Update the number of frames
-    count[0] += 1
+        frame_count += 1
+
+        # Return the objects to update during animation
+        return line, line_fft
+
+    except TclError as e:
+        print(f"TclError: {e}")
+        on_close(None)
 
 
 if __name__ == "__main__":
     start_time = time.time()
 
-    anim = animation.FuncAnimation(fig, animate, blit=False, interval=1)
+    # Create the animation object with blit=True
+    anim = animation.FuncAnimation(
+        fig, animate, interval=1, blit=True, cache_frame_data=False
+    )
     fig.canvas.mpl_connect("close_event", on_close)
     plt.show()
