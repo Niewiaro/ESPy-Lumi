@@ -80,13 +80,14 @@ print("Stream started")
 
 def on_close(evt):
     """Handle figure close event."""
-    global frame_count, start_time
+    global frame_count, start_time, fig
     frame_rate = frame_count / (time.time() - start_time)
 
     # Stop and close the audio stream
     stream.stop_stream()
     stream.close()
     p.terminate()
+    plt.close(fig)
 
     print("Stream stopped")
     print(f"Average frame rate: {frame_rate:.2f} FPS")
