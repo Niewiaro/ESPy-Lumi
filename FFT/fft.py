@@ -66,11 +66,13 @@ ax1.set_ylabel("Amplitude")
 ax1.set_ylim(-AMPLITUDE_LIMIT, AMPLITUDE_LIMIT)
 ax1.set_xlim(0, 2 * CHUNK)
 
+ax2.set_xscale("log")  # Ustawienie logarytmicznej skali na osi X
+ax2.set_xlim(400, 4000)  # Ustawienie zakresu od 400 Hz do 4000 Hz
 # Format spectrum axes
 ax2.set_title("Frequency Spectrum")
 ax2.set_xlabel("Frequency (Hz)")
 ax2.set_ylabel("Magnitude")
-ax2.set_xlim(20, RATE // 2)
+# ax2.set_xlim(20, RATE // 2)
 ax2.set_ylim(0, AMPLITUDE_LIMIT)
 
 print("Stream started")
@@ -115,6 +117,10 @@ def animate(i):
 
     except TclError as e:
         print(f"TclError: {e}")
+        on_close(None)
+
+    except Exception as e:
+        print(f"Unexpected error: {e}")
         on_close(None)
 
 
