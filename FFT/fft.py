@@ -1,18 +1,13 @@
 """
-pip install pyAudio may not work
-Instead download and install a wheel from here:
-https://www.lfd.uci.edu/~gohlke/pythonlibs/#pyaudio
-
-or use: 
-
-pip install pipwin
-pipwin install pyaudio
+based on mark's code:
+https://github.com/markjay4k/Audio-Spectrum-Analyzer-in-Python/blob/master/spec_anim.py
 """
 
-# to display in separate Tk window
 import matplotlib
+import matplotlib.cm as cm
+import matplotlib.colors as mcolors
 
-matplotlib.use("TkAgg")
+matplotlib.use("TkAgg")  # to display in separate Tk window
 
 import pyaudio
 import numpy as np
@@ -32,8 +27,9 @@ CHANNELS = 1  # single channel for microphone
 RATE = 44100  # samples per second
 AMPLITUDE_LIMIT = 2048  # limiting amplitude
 
-MIN_FREQ = 400
-MAX_FREQ = 4000
+MIN_FREQ = 40
+MAX_FREQ = 14000
+N_BARS = 144  # Number of equalizer bars
 
 # Initialize PyAudio
 p = pyaudio.PyAudio()
@@ -54,7 +50,7 @@ except Exception as e:
     exit()
 
 # ------------ Plot Setup ---------------
-fig, (ax1, ax2) = plt.subplots(2, figsize=(15, 7))
+fig, (ax1, ax2, ax3) = plt.subplots(3, figsize=(15, 10))
 x = np.arange(0, 2 * CHUNK, 2)  # samples (waveform)
 xf = np.linspace(0, RATE // 2, CHUNK // 2 + 1)  # frequencies (spectrum)
 
@@ -69,14 +65,58 @@ ax1.set_ylabel("Amplitude")
 ax1.set_ylim(-AMPLITUDE_LIMIT, AMPLITUDE_LIMIT)
 ax1.set_xlim(0, 2 * CHUNK)
 
-ax2.set_xscale("log")  # Ustawienie logarytmicznej skali na osi X
-ax2.set_xlim(MIN_FREQ, MAX_FREQ)  # Ustawienie zakresu od 400 Hz do 4000 Hz
-# Format spectrum axes
+ax2.set_xscale("log")  # Logarithmic scale on X-axis
+ax2.set_xlim(MIN_FREQ, MAX_FREQ)
 ax2.set_title("Frequency Spectrum")
 ax2.set_xlabel("Frequency (Hz)")
 ax2.set_ylabel("Magnitude")
-# ax2.set_xlim(20, RATE // 2)
 ax2.set_ylim(0, AMPLITUDE_LIMIT)
+
+# Equalizer setup
+bar_positions = np.arange(N_BARS)  # Linear positions for the bars
+bars = ax3.bar(
+    bar_positions, np.zeros(N_BARS), width=0.8, align="center", edgecolor="k"
+)
+
+# Assign colors to bars using a colormap
+cmap = cm.get_cmap("rainbow", N_BARS)  # Tęczowy gradient
+colors = [cmap(i) for i in reversed(range(N_BARS))]
+for bar, color in zip(bars, colors):
+    bar.set_color(color)
+
+ax3.set_xlim(0, N_BARS)
+ax3.set_ylim(0, AMPLITUDE_LIMIT)
+ax3.set_title("Equalizer")
+ax3.set_xlabel("Bars")
+ax3.set_ylabel("Amplitude")
+
+
+# Precompute frequency ranges for the bars
+log_bins = np.logspace(
+    np.log10(MIN_FREQ), np.log10(MAX_FREQ), N_BARS + 1
+)  # Logarithmic bin edges
+
+
+def map_fft_to_linear_bars(magnitude, freq_bins, log_bins):
+    """Map FFT magnitudes to equalizer bars with linear x-axis using interpolation."""
+    bar_heights = np.zeros(len(log_bins) - 1)
+    for i in range(len(log_bins) - 1):
+        # Find FFT bins within the current log range
+        start_idx = np.searchsorted(freq_bins, log_bins[i])
+        end_idx = np.searchsorted(freq_bins, log_bins[i + 1])
+
+        # If the range has data, calculate the max value
+        if end_idx > start_idx:
+            bar_heights[i] = np.max(magnitude[start_idx:end_idx])
+        else:
+            # Interpolate value for empty ranges
+            bar_heights[i] = np.interp(
+                (log_bins[i] + log_bins[i + 1])
+                / 2,  # The center frequency of the interval
+                freq_bins,
+                magnitude,
+            )
+    return bar_heights
 
 
 def on_close(evt):
@@ -108,13 +148,17 @@ def animate(i):
         line.set_ydata(data_np)
 
         # Compute FFT and update spectrum
-        magnitude = np.abs(rfft(data_np)) / (CHUNK / 2)  # Now returns 1025 samples
+        magnitude = np.abs(rfft(data_np)) / (CHUNK / 2)
         line_fft.set_ydata(magnitude)
+
+        # Update equalizer bars
+        bar_heights = map_fft_to_linear_bars(magnitude, xf, log_bins)
+        for bar, height in zip(bars, bar_heights):
+            bar.set_height(height)
 
         frame_count += 1
 
-        # Return the objects to update during animation
-        return line, line_fft
+        return line, line_fft, *bars
 
     except TclError as e:
         print(f"TclError: {e}")
@@ -134,6 +178,9 @@ if __name__ == "__main__":
         fig, animate, interval=20, blit=True, cache_frame_data=False
     )
     fig.canvas.mpl_connect("close_event", on_close)
+    fig.subplots_adjust(hspace=0.4)
+    plt.tight_layout()
+
     try:
         plt.show()
     except KeyboardInterrupt:
