@@ -188,7 +188,7 @@ if __name__ == "__main__":
 
     # Create the animation object with blit=True
     anim = animation.FuncAnimation(
-        fig, animate, interval=20, blit=True, cache_frame_data=False
+        fig, animate, interval=10, blit=True, cache_frame_data=False
     )
     fig.canvas.mpl_connect("close_event", on_close)
     fig.subplots_adjust(hspace=0.4)
