@@ -16,6 +16,7 @@ from matplotlib import animation
 from numpy.fft import rfft
 import time
 from tkinter import TclError
+import math
 
 # Counts the frames
 frame_count = 0
@@ -30,6 +31,7 @@ AMPLITUDE_LIMIT = 2048  # limiting amplitude
 MIN_FREQ = 40
 MAX_FREQ = 14000
 N_BARS = 144  # Number of equalizer bars
+LIMIT_BARS = 255
 
 # Initialize PyAudio
 p = pyaudio.PyAudio()
@@ -85,7 +87,7 @@ for bar, color in zip(bars, colors):
     bar.set_color(color)
 
 ax3.set_xlim(0, N_BARS)
-ax3.set_ylim(0, AMPLITUDE_LIMIT)
+ax3.set_ylim(0, LIMIT_BARS)
 ax3.set_title("Equalizer")
 ax3.set_xlabel("Bars")
 ax3.set_ylabel("Amplitude")
@@ -95,6 +97,17 @@ ax3.set_ylabel("Amplitude")
 log_bins = np.logspace(
     np.log10(MIN_FREQ), np.log10(MAX_FREQ), N_BARS + 1
 )  # Logarithmic bin edges
+
+
+def normalize_bars(bar_heights):
+    global LIMIT_BARS, AMPLITUDE_LIMIT
+    """
+    Normalize bar heights to the range [0, limit_bars], scaling by amplitude_limit.
+    Values are rounded up to the nearest integer.
+    """
+    for i, value in enumerate(bar_heights):
+        bar_heights[i] = math.ceil(value * LIMIT_BARS / AMPLITUDE_LIMIT)
+    return bar_heights
 
 
 def map_fft_to_linear_bars(magnitude, freq_bins, log_bins):
@@ -116,7 +129,7 @@ def map_fft_to_linear_bars(magnitude, freq_bins, log_bins):
                 freq_bins,
                 magnitude,
             )
-    return bar_heights
+    return normalize_bars(bar_heights)
 
 
 def on_close(evt):
@@ -175,7 +188,7 @@ if __name__ == "__main__":
 
     # Create the animation object with blit=True
     anim = animation.FuncAnimation(
-        fig, animate, interval=20, blit=True, cache_frame_data=False
+        fig, animate, interval=10, blit=True, cache_frame_data=False
     )
     fig.canvas.mpl_connect("close_event", on_close)
     fig.subplots_adjust(hspace=0.4)
