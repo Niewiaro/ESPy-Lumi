@@ -3,7 +3,9 @@ from kivymd.uix.label import MDLabel, MDIcon
 
 class ESPy_LumiApp(MDApp):
     def build(self):
-        label = MDLabel(text="Hello, World!", halign="center", font_style='H1')
+        self.theme_cls.theme_style = "Dark"
+        label = MDLabel(text="Hello, World!", halign="center", font_style="Display")
+        # label.font_size = "32sp"
         return label
 
 
