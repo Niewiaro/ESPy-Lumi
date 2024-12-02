@@ -17,6 +17,7 @@ from numpy.fft import rfft
 import time
 from tkinter import TclError
 import math
+import serial
 
 # Counts the frames
 frame_count = 0
@@ -50,6 +51,20 @@ except Exception as e:
     print(f"Error opening audio stream: {e}")
     p.terminate()
     exit()
+
+# Ustawienia portu szeregowego
+SERIAL_PORT = 'COM5'  # Zmień, jeśli COM5 jest inny
+BAUD_RATE = 115200
+
+try:
+    # Otwórz połączenie szeregowe
+    ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=1)
+    print(f"Połączono z {SERIAL_PORT}")
+
+except serial.SerialException as e:
+    print(f"Błąd połączenia: {e}")
+except KeyboardInterrupt:
+    print("Przerwano przez użytkownika.")
 
 # ------------ Plot Setup ---------------
 fig, (ax1, ax2, ax3) = plt.subplots(3, figsize=(15, 10))
@@ -129,12 +144,19 @@ def map_fft_to_linear_bars(magnitude, freq_bins, log_bins):
                 freq_bins,
                 magnitude,
             )
-    return normalize_bars(bar_heights)
+    result = normalize_bars(bar_heights)
+    # Konwertuj listę na string oddzielony przecinkami
+    data = ','.join(map(str, np.flip(result))) + '\n'
+
+    # Wyślij dane przez Serial
+    ser.write(data.encode())
+    # print(f"Wysłano: {data.strip()}")
+    return result
 
 
 def on_close(evt):
     """Handle figure close event."""
-    global frame_count, start_time, fig
+    global frame_count, start_time, fig, ser
     frame_rate = frame_count / (time.time() - start_time)
 
     # Stop and close the audio stream
@@ -142,6 +164,7 @@ def on_close(evt):
     stream.close()
     p.terminate()
     plt.close(fig)
+    ser.close()
 
     print("Stream stopped")
     print(f"Average frame rate: {frame_rate:.2f} FPS")
