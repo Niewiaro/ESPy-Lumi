@@ -53,7 +53,7 @@ except Exception as e:
     exit()
 
 # Ustawienia portu szeregowego
-SERIAL_PORT = 'COM5'  # Zmień, jeśli COM5 jest inny
+SERIAL_PORT = "COM6"  # Zmień, jeśli COM5 jest inny
 BAUD_RATE = 115200
 
 try:
@@ -121,11 +121,15 @@ def normalize_bars(bar_heights):
     Values are rounded up to the nearest integer.
     """
     for i, value in enumerate(bar_heights):
-        bar_heights[i] = math.ceil(value * LIMIT_BARS / AMPLITUDE_LIMIT)
+        if bar_heights[i] < 1:
+            bar_heights[i] = value * LIMIT_BARS / AMPLITUDE_LIMIT
+        else:
+            bar_heights[i] = math.ceil(value * LIMIT_BARS / AMPLITUDE_LIMIT)
     return bar_heights
 
 
 def map_fft_to_linear_bars(magnitude, freq_bins, log_bins):
+    global ser
     """Map FFT magnitudes to equalizer bars with linear x-axis using interpolation."""
     bar_heights = np.zeros(len(log_bins) - 1)
     for i in range(len(log_bins) - 1):
@@ -145,8 +149,9 @@ def map_fft_to_linear_bars(magnitude, freq_bins, log_bins):
                 magnitude,
             )
     result = normalize_bars(bar_heights)
-    # Konwertuj listę na string oddzielony przecinkami
-    data = ','.join(map(str, np.flip(result))) + '\n'
+
+    # Mapowanie wartości na int i odwrócenie kolejności (np.flip)
+    data = ",".join(map(str, map(int, np.flip(result)))) + "\n"
 
     # Wyślij dane przez Serial
     ser.write(data.encode())
