@@ -17,7 +17,6 @@ from numpy.fft import rfft
 import time
 from tkinter import TclError
 import math
-import serial
 
 # Counts the frames
 frame_count = 0
@@ -81,6 +80,27 @@ class Config:
             p.terminate()
             exit()
 
+    def serial_connection(
+        self, serial_port: str = None, baud_rate: int = None, timeout: int = 1
+    ):
+        import serial
+
+        if serial_port is None:
+            serial_port = self.serial_port
+
+        if baud_rate is None:
+            baud_rate = self.baud_rate
+
+        try:
+            ser = serial.Serial(serial_port, baud_rate, timeout=timeout)
+            print(f"Connected with {serial_port}")
+            return ser
+
+        except serial.SerialException as e:
+            print(f"Connection error: {e}")
+        except KeyboardInterrupt:
+            print("User interrupt.")
+
 
 # ------------ Audio Setup ---------------
 CHUNK = 1024 * 2  # samples per frame
@@ -93,38 +113,6 @@ MIN_FREQ = 40
 MAX_FREQ = 14000
 N_BARS = 144  # Number of equalizer bars
 LIMIT_BARS = 255
-
-# Initialize PyAudio
-p = pyaudio.PyAudio()
-
-try:
-    # Open audio stream
-    stream = p.open(
-        format=FORMAT,
-        channels=CHANNELS,
-        rate=RATE,
-        input=True,
-        output=False,
-        frames_per_buffer=CHUNK,
-    )
-except Exception as e:
-    print(f"Error opening audio stream: {e}")
-    p.terminate()
-    exit()
-
-# Ustawienia portu szeregowego
-SERIAL_PORT = "COM6"  # Zmień, jeśli COM5 jest inny
-BAUD_RATE = 115200
-
-try:
-    # Otwórz połączenie szeregowe
-    ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=1)
-    print(f"Połączono z {SERIAL_PORT}")
-
-except serial.SerialException as e:
-    print(f"Błąd połączenia: {e}")
-except KeyboardInterrupt:
-    print("Przerwano przez użytkownika.")
 
 # ------------ Plot Setup ---------------
 fig, (ax1, ax2, ax3) = plt.subplots(3, figsize=(15, 10))
@@ -189,7 +177,7 @@ def normalize_bars(bar_heights):
 
 
 def map_fft_to_linear_bars(magnitude, freq_bins, log_bins):
-    global ser
+    # global ser
     """Map FFT magnitudes to equalizer bars with linear x-axis using interpolation."""
     bar_heights = np.zeros(len(log_bins) - 1)
     for i in range(len(log_bins) - 1):
@@ -214,78 +202,114 @@ def map_fft_to_linear_bars(magnitude, freq_bins, log_bins):
     data = ",".join(map(str, map(int, np.flip(result)))) + "\n"
 
     # Wyślij dane przez Serial
-    ser.write(data.encode())
+    # ser.write(data.encode())
     # print(f"Wysłano: {data.strip()}")
     return result
 
 
-def on_close(evt):
-    """Handle figure close event."""
-    global frame_count, start_time, fig, ser
-    frame_rate = frame_count / (time.time() - start_time)
+def animate_factory(stream, on_close, frame_count):
+    def animate(i):
+        """Update plot for animation."""
+        try:
+            # Read audio data
+            data = stream.read(CHUNK, exception_on_overflow=False)
+            data_np = np.frombuffer(data, dtype=np.int16)
 
-    # Stop and close the audio stream
-    stream.stop_stream()
-    stream.close()
-    p.terminate()
-    plt.close(fig)
-    ser.close()
+            # Update waveform
+            line.set_ydata(data_np)
 
-    print("Stream stopped")
-    print(f"Average frame rate: {frame_rate:.2f} FPS")
-    quit()
+            # Compute FFT and update spectrum
+            magnitude = np.abs(rfft(data_np)) / (CHUNK / 2)
+            line_fft.set_ydata(magnitude)
+
+            # Update equalizer bars
+            bar_heights = map_fft_to_linear_bars(magnitude, xf, log_bins)
+            for bar, height in zip(bars, bar_heights):
+                bar.set_height(height)
+
+            frame_count[0] += 1
+
+            # Return the objects to update during animation
+            return line, line_fft, *bars
+
+        except TclError as e:
+            print(f"TclError: {e}")
+            on_close(None)
+        except Exception as e:
+            print(f"Unexpected error: {e}")
+            on_close(None)
+
+    return animate
 
 
-def animate(i):
-    """Update plot for animation."""
-    global frame_count
+def on_close_factory(stream, p, fig, ser, frame_count, start_time):
+    def on_close(evt=None):
+        """Close resources and stop the program."""
+        try:
+            # Stop the audio stream
+            if stream is not None:
+                stream.stop_stream()
+                stream.close()
 
-    try:
-        # Read audio data
-        data = stream.read(CHUNK, exception_on_overflow=False)
-        data_np = np.frombuffer(data, dtype=np.int16)
+            # Terminate PyAudio
+            if p is not None:
+                p.terminate()
 
-        # Update waveform
-        line.set_ydata(data_np)
+            # Close the serial port if open
+            if ser is not None and ser.is_open:
+                ser.close()
 
-        # Compute FFT and update spectrum
-        magnitude = np.abs(rfft(data_np)) / (CHUNK / 2)
-        line_fft.set_ydata(magnitude)
+            # Close the figure
+            if fig is not None:
+                plt.close(fig)
 
-        # Update equalizer bars
-        bar_heights = map_fft_to_linear_bars(magnitude, xf, log_bins)
-        for bar, height in zip(bars, bar_heights):
-            bar.set_height(height)
+            # Print frame count and FPS
+            if frame_count[0] is not None:
+                elapsed_time = time.time() - start_time
+                print(
+                    f"Stream stopped. Average frame rate: {frame_count[0] / elapsed_time:.2f} FPS"
+                )
+        except Exception as e:
+            print(f"Error during cleanup: {e}")
+        finally:
+            quit()
 
-        frame_count += 1
-
-        return line, line_fft, *bars
-
-    except TclError as e:
-        print(f"TclError: {e}")
-        on_close(None)
-
-    except Exception as e:
-        print(f"Unexpected error: {e}")
-        on_close(None)
+    return on_close
 
 
 def main() -> None:
+    config = Config()
+    p, stream = config.stream_audio()
+    # ser = config.serial_connection()
+    ser = None
+
+    frame_count = [0]
+
     start_time = time.time()
     print(f"Stream started at {time.strftime('%Y-%m-%d %H:%M:%S')}")
 
-    # Create the animation object with blit=True
-    anim = animation.FuncAnimation(
-        fig, animate, interval=10, blit=True, cache_frame_data=False
-    )
+    # Create on_close function using factory
+    on_close = on_close_factory(stream, p, fig, ser, frame_count, start_time)
+
+    # Connect on_close to the figure close event
     fig.canvas.mpl_connect("close_event", on_close)
     fig.subplots_adjust(hspace=0.4)
     plt.tight_layout()
 
+    # Create animate function using factory
+    anim = animation.FuncAnimation(
+        fig,
+        animate_factory(stream, on_close, frame_count),
+        interval=10,
+        blit=True,
+        cache_frame_data=False,
+    )
+
+    # Start the visualization
     try:
         plt.show()
     except KeyboardInterrupt:
-        print("Program interrupted by user.")
+        print("Interrupted by user.")
         on_close()
 
 
