@@ -22,6 +22,46 @@ import serial
 # Counts the frames
 frame_count = 0
 
+
+class Config:
+    def __init__(
+        self,
+        chunk: int = 1024 * 2,  # Number of audio samples per frame for processing.
+        format=pyaudio.paInt16,  # Audio format (16-bit integer, default for most audio applications).
+        channels: int = 1,  # Number of audio channels (1 for mono, 2 for stereo).
+        rate: int = 44100,  # Sample rate in Hz (common standard for audio, e.g., CD quality).
+        amplitude_limit: int = 2048,  # Maximum amplitude value for visualization normalization.
+        freq_min: int = 40,  # Minimum frequency in Hz for visualization (e.g., lowest note to display).
+        freq_max: int = 14000,  # Maximum frequency in Hz for visualization (e.g., upper limit of audible range).
+        bars_num: int = 144,  # Number of bars in the visualization equalizer.
+        bars_limit: int = 255,  # Maximum height of a bar in the visualization (e.g., 8-bit LED range).
+        serial_port: str = "COM6",  # Serial port for connecting to external hardware (e.g., LED controller).
+        baud_rate: int = 115200,  # Baud rate for serial communication (default for many devices).
+    ) -> None:
+        # Audio settings
+        self.chunk = chunk  # Number of audio samples processed at a time.
+        self.format = format  # Format for PyAudio (defines how audio data is read).
+        self.channels = channels  # Mono or stereo input.
+        self.rate = rate  # Audio sampling rate in Hz.
+        self.amplitude_limit = (
+            amplitude_limit  # Upper bound for amplitude visualization.
+        )
+
+        # Frequency range for visualization
+        self.freq_min = freq_min  # Lower bound of the frequency range displayed.
+        self.freq_max = freq_max  # Upper bound of the frequency range displayed.
+
+        # Visualization settings
+        self.bars_num = bars_num  # Total number of bars in the equalizer visualization.
+        self.bars_limit = bars_limit  # Maximum value for bar height normalization (e.g., LED intensity).
+
+        # Serial connection settings
+        self.serial_port = (
+            serial_port  # Name of the serial port used for hardware communication.
+        )
+        self.baud_rate = baud_rate  # Speed of serial communication in bits per second.
+
+
 # ------------ Audio Setup ---------------
 CHUNK = 1024 * 2  # samples per frame
 FORMAT = pyaudio.paInt16  # audio format (16-bit integer)
