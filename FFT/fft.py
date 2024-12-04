@@ -61,6 +61,26 @@ class Config:
         )
         self.baud_rate = baud_rate  # Speed of serial communication in bits per second.
 
+    def stream_audio(self, input: bool = True, output: bool = False):
+        try:
+            p = pyaudio.PyAudio()  # Initialize PyAudio
+
+            # Open audio stream
+            stream = p.open(
+                format=self.format,
+                channels=self.channels,
+                rate=self.rate,
+                input=input,
+                output=output,
+                frames_per_buffer=self.chunk,
+            )
+            return p, stream
+
+        except Exception as e:
+            print(f"Error opening audio stream: {e}")
+            p.terminate()
+            exit()
+
 
 # ------------ Audio Setup ---------------
 CHUNK = 1024 * 2  # samples per frame
@@ -250,7 +270,7 @@ def animate(i):
         on_close(None)
 
 
-if __name__ == "__main__":
+def main() -> None:
     start_time = time.time()
     print(f"Stream started at {time.strftime('%Y-%m-%d %H:%M:%S')}")
 
@@ -267,3 +287,7 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("Program interrupted by user.")
         on_close()
+
+
+if __name__ == "__main__":
+    main()
