@@ -1,25 +1,5 @@
-"""
-based on mark's code:
-https://github.com/markjay4k/Audio-Spectrum-Analyzer-in-Python/blob/master/spec_anim.py
-"""
-
-import matplotlib
-import matplotlib.cm as cm
-import matplotlib.colors as mcolors
-
-matplotlib.use("TkAgg")  # to display in separate Tk window
-
 import pyaudio
 import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib import animation
-from numpy.fft import rfft
-import time
-from tkinter import TclError
-import math
-
-# Counts the frames
-frame_count = 0
 
 
 class Config:
@@ -94,89 +74,34 @@ class Config:
         try:
             ser = serial.Serial(serial_port, baud_rate, timeout=timeout)
             print(f"Connected with {serial_port}")
-            return ser
 
         except serial.SerialException as e:
             print(f"Connection error: {e}")
         except KeyboardInterrupt:
             print("User interrupt.")
 
-
-# ------------ Audio Setup ---------------
-CHUNK = 1024 * 2  # samples per frame
-FORMAT = pyaudio.paInt16  # audio format (16-bit integer)
-CHANNELS = 1  # single channel for microphone
-RATE = 44100  # samples per second
-AMPLITUDE_LIMIT = 2048  # limiting amplitude
-
-MIN_FREQ = 40
-MAX_FREQ = 14000
-N_BARS = 144  # Number of equalizer bars
-LIMIT_BARS = 255
-
-# ------------ Plot Setup ---------------
-fig, (ax1, ax2, ax3) = plt.subplots(3, figsize=(15, 10))
-x = np.arange(0, 2 * CHUNK, 2)  # samples (waveform)
-xf = np.linspace(0, RATE // 2, CHUNK // 2 + 1)  # frequencies (spectrum)
-
-# Create line objects
-(line,) = ax1.plot(x, np.zeros(CHUNK), "-", lw=2)
-(line_fft,) = ax2.semilogx(xf, np.zeros(CHUNK // 2 + 1), "-", lw=2)
-
-# Format waveform axes
-ax1.set_title("Audio Waveform")
-ax1.set_xlabel("Samples")
-ax1.set_ylabel("Amplitude")
-ax1.set_ylim(-AMPLITUDE_LIMIT, AMPLITUDE_LIMIT)
-ax1.set_xlim(0, 2 * CHUNK)
-
-ax2.set_xscale("log")  # Logarithmic scale on X-axis
-ax2.set_xlim(MIN_FREQ, MAX_FREQ)
-ax2.set_title("Frequency Spectrum")
-ax2.set_xlabel("Frequency (Hz)")
-ax2.set_ylabel("Magnitude")
-ax2.set_ylim(0, AMPLITUDE_LIMIT)
-
-# Equalizer setup
-bar_positions = np.arange(N_BARS)  # Linear positions for the bars
-bars = ax3.bar(
-    bar_positions, np.zeros(N_BARS), width=0.8, align="center", edgecolor="k"
-)
-
-# Assign colors to bars using a colormap
-cmap = cm.get_cmap("rainbow", N_BARS)  # Tęczowy gradient
-colors = [cmap(i) for i in reversed(range(N_BARS))]
-for bar, color in zip(bars, colors):
-    bar.set_color(color)
-
-ax3.set_xlim(0, N_BARS)
-ax3.set_ylim(0, LIMIT_BARS)
-ax3.set_title("Equalizer")
-ax3.set_xlabel("Bars")
-ax3.set_ylabel("Amplitude")
+        finally:
+            return ser
 
 
-# Precompute frequency ranges for the bars
-log_bins = np.logspace(
-    np.log10(MIN_FREQ), np.log10(MAX_FREQ), N_BARS + 1
-)  # Logarithmic bin edges
-
-
-def normalize_bars(bar_heights):
-    global LIMIT_BARS, AMPLITUDE_LIMIT
+def normalize_equalizer(input, input_limit, result_limit):
     """
     Normalize bar heights to the range [0, limit_bars], scaling by amplitude_limit.
     Values are rounded up to the nearest integer.
     """
-    for i, value in enumerate(bar_heights):
-        if bar_heights[i] < 1:
-            bar_heights[i] = value * LIMIT_BARS / AMPLITUDE_LIMIT
+    from copy import copy
+    from math import ceil
+
+    result = copy(input)
+    for i, value in enumerate(result):
+        if result[i] < 1:
+            result[i] = value * result_limit / input_limit
         else:
-            bar_heights[i] = math.ceil(value * LIMIT_BARS / AMPLITUDE_LIMIT)
-    return bar_heights
+            result[i] = ceil(value * result_limit / input_limit)
+    return result
 
 
-def map_fft_to_linear_bars(magnitude, freq_bins, log_bins):
+def map_spectrum_to_equalizer(magnitude, freq_bins, log_bins):
     # global ser
     """Map FFT magnitudes to equalizer bars with linear x-axis using interpolation."""
     bar_heights = np.zeros(len(log_bins) - 1)
@@ -196,110 +121,145 @@ def map_fft_to_linear_bars(magnitude, freq_bins, log_bins):
                 freq_bins,
                 magnitude,
             )
-    result = normalize_bars(bar_heights)
 
-    # Mapowanie wartości na int i odwrócenie kolejności (np.flip)
-    data = ",".join(map(str, map(int, np.flip(result)))) + "\n"
-
-    # Wyślij dane przez Serial
-    # ser.write(data.encode())
-    # print(f"Wysłano: {data.strip()}")
-    return result
+    return bar_heights
 
 
-def animate_factory(stream, on_close, frame_count):
-    def animate(i):
-        """Update plot for animation."""
-        try:
-            # Read audio data
-            data = stream.read(CHUNK, exception_on_overflow=False)
-            data_np = np.frombuffer(data, dtype=np.int16)
-
-            # Update waveform
-            line.set_ydata(data_np)
-
-            # Compute FFT and update spectrum
-            magnitude = np.abs(rfft(data_np)) / (CHUNK / 2)
-            line_fft.set_ydata(magnitude)
-
-            # Update equalizer bars
-            bar_heights = map_fft_to_linear_bars(magnitude, xf, log_bins)
-            for bar, height in zip(bars, bar_heights):
-                bar.set_height(height)
-
-            frame_count[0] += 1
-
-            # Return the objects to update during animation
-            return line, line_fft, *bars
-
-        except TclError as e:
-            print(f"TclError: {e}")
-            on_close(None)
-        except Exception as e:
-            print(f"Unexpected error: {e}")
-            on_close(None)
-
-    return animate
+def get_waveform(stream, chunk: int):
+    data = stream.read(chunk, exception_on_overflow=False)
+    data_np = np.frombuffer(data, dtype=np.int16)
+    return data_np
 
 
-def on_close_factory(stream, p, fig, ser, frame_count, start_time):
-    def on_close(evt=None):
-        """Close resources and stop the program."""
-        try:
-            # Stop the audio stream
-            if stream is not None:
-                stream.stop_stream()
-                stream.close()
+def get_spectrum_magnitude(waveform_data, chunk: int):
+    from numpy.fft import rfft
 
-            # Terminate PyAudio
-            if p is not None:
-                p.terminate()
-
-            # Close the serial port if open
-            if ser is not None and ser.is_open:
-                ser.close()
-
-            # Close the figure
-            if fig is not None:
-                plt.close(fig)
-
-            # Print frame count and FPS
-            if frame_count[0] is not None:
-                elapsed_time = time.time() - start_time
-                print(
-                    f"Stream stopped. Average frame rate: {frame_count[0] / elapsed_time:.2f} FPS"
-                )
-        except Exception as e:
-            print(f"Error during cleanup: {e}")
-        finally:
-            quit()
-
-    return on_close
+    magnitude = np.abs(rfft(waveform_data)) / (chunk / 2)
+    return magnitude
 
 
 def main() -> None:
+    import matplotlib
+    import matplotlib.pyplot as plt
+    from matplotlib import animation
+    import matplotlib.cm as cm
+
+    matplotlib.use("TkAgg")  # to display in separate Tk window
+
+    import time
+    from tkinter import TclError
+
+    # Configuration
     config = Config()
     p, stream = config.stream_audio()
     # ser = config.serial_connection()
     ser = None
 
+    # Plot Setup
+    fig, (ax1, ax2, ax3) = plt.subplots(3, figsize=(15, 10))
+    waveform = np.arange(0, 2 * config.chunk, 2)  # samples (waveform)
+    spectrum = np.linspace(
+        0, config.rate // 2, config.chunk // 2 + 1
+    )  # frequencies (spectrum)
+    equalizer = np.arange(config.bars_num)  # Linear positions for the bars
+
+    # Create line objects
+    (waveform_line,) = ax1.plot(waveform, np.zeros(config.chunk), "-", lw=2)
+    (spectrum_line,) = ax2.semilogx(
+        spectrum, np.zeros(config.chunk // 2 + 1), "-", lw=2
+    )
+    equalizer_bar = ax3.bar(
+        equalizer, np.zeros(config.bars_num), width=0.8, align="center", edgecolor="k"
+    )
+
+    # Format waveform axes
+    ax1.set_title("Audio Waveform")
+    ax1.set_xlabel("Samples")
+    ax1.set_ylabel("Amplitude")
+    ax1.set_xlim(0, 2 * config.chunk)
+    ax1.set_ylim(-config.amplitude_limit, config.amplitude_limit)
+
+    # Format spectrum axes
+    ax2.set_xscale("log")  # Logarithmic scale on X-axis
+    ax2.set_title("Frequency Spectrum")
+    ax2.set_xlabel("Frequency (Hz)")
+    ax2.set_ylabel("Magnitude")
+    ax2.set_xlim(config.freq_min, config.freq_max)
+    ax2.set_ylim(0, config.amplitude_limit)
+
+    # Format equalizer axes
+    ax3.set_title("Equalizer")
+    ax3.set_xlabel("Bars")
+    ax3.set_ylabel("Amplitude")
+    ax3.set_xlim(0, config.bars_num)
+    ax3.set_ylim(0, config.bars_limit)
+
+    # Assign colors to bars using a colormap
+    cmap = cm.get_cmap("rainbow", config.bars_num)
+    colors = [cmap(i) for i in reversed(range(config.bars_num))]
+    for bar, color in zip(equalizer_bar, colors):
+        bar.set_color(color)
+
+    # Precompute frequency ranges for the bars
+    log_bins = np.logspace(
+        np.log10(config.freq_min), np.log10(config.freq_max), config.bars_num + 1
+    )  # Logarithmic bin edges
+
+    # Figure layout
+    fig.subplots_adjust(hspace=0.4)
+    plt.tight_layout()
+
+    # Counting FPS by mutable object
     frame_count = [0]
+
+    def animate(i):
+        """
+        Update plot for animation
+        based on mark's code:
+        https://github.com/markjay4k/Audio-Spectrum-Analyzer-in-Python/blob/master/spec_anim.py
+        """
+        try:
+            # Read audio data
+            waveform_data = get_waveform(stream, config.chunk)
+
+            # Update waveform
+            waveform_line.set_ydata(waveform_data)
+
+            # Compute FFT and update spectrum
+            spectrum_data = get_spectrum_magnitude(waveform_data, config.chunk)
+            spectrum_line.set_ydata(spectrum_data)
+
+            # Update equalizer bars
+            bar_heights = map_spectrum_to_equalizer(spectrum_data, spectrum, log_bins)
+            bar_heights = normalize_equalizer(
+                bar_heights, config.amplitude_limit, config.bars_limit
+            )
+
+            if ser:
+                # Map values to INT and flip data
+                data = ",".join(map(str, map(int, np.flip(bar_heights)))) + "\n"
+                ser.write(data.encode())
+
+            for bar, height in zip(equalizer_bar, bar_heights):
+                bar.set_height(height)
+
+            frame_count[0] += 1
+
+            # Return the objects to update during animation
+            return waveform_line, spectrum_line, *equalizer_bar
+
+        except TclError as e:
+            print(f"TclError: {e}")
+        except Exception as e:
+            print(f"Unexpected error: {e}")
 
     start_time = time.time()
     print(f"Stream started at {time.strftime('%Y-%m-%d %H:%M:%S')}")
 
-    # Create on_close function using factory
-    on_close = on_close_factory(stream, p, fig, ser, frame_count, start_time)
-
-    # Connect on_close to the figure close event
-    fig.canvas.mpl_connect("close_event", on_close)
-    fig.subplots_adjust(hspace=0.4)
-    plt.tight_layout()
-
     # Create animate function using factory
     anim = animation.FuncAnimation(
         fig,
-        animate_factory(stream, on_close, frame_count),
+        animate,
         interval=10,
         blit=True,
         cache_frame_data=False,
@@ -310,7 +270,30 @@ def main() -> None:
         plt.show()
     except KeyboardInterrupt:
         print("Interrupted by user.")
-        on_close()
+    finally:
+        # Print frame count and FPS
+        if frame_count[0] is not None:
+            elapsed_time = time.time() - start_time
+            print(
+                f"Stream stopped. Average frame rate: {frame_count[0] / elapsed_time:.2f} FPS"
+            )
+
+        # Stop the audio stream
+        if stream is not None:
+            stream.stop_stream()
+            stream.close()
+
+        # Terminate PyAudio
+        if p is not None:
+            p.terminate()
+
+        # Close the serial port if open
+        if ser is not None and ser.is_open:
+            ser.close()
+
+        # Close the figure
+        if fig is not None:
+            plt.close(fig)
 
 
 if __name__ == "__main__":
