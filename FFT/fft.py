@@ -92,20 +92,19 @@ def normalize_equalizer(input, input_limit, result_limit):
     result = input.copy()
     for i, value in enumerate(result):
         value = value * result_limit / input_limit
-        if value > 1:
+        if value > 1:  # reduce noise
             value = ceil(value)
         result[i] = int(value)
     return result
 
 
-def map_spectrum_to_equalizer(magnitude, freq_bins, log_bins):
-    # global ser
+def map_spectrum_to_equalizer(magnitude, spectrum, log_bins):
     """Map FFT magnitudes to equalizer bars with linear x-axis using interpolation."""
     bar_heights = np.zeros(len(log_bins) - 1)
     for i in range(len(log_bins) - 1):
         # Find FFT bins within the current log range
-        start_idx = np.searchsorted(freq_bins, log_bins[i])
-        end_idx = np.searchsorted(freq_bins, log_bins[i + 1])
+        start_idx = np.searchsorted(spectrum, log_bins[i])
+        end_idx = np.searchsorted(spectrum, log_bins[i + 1])
 
         # If the range has data, calculate the max value
         if end_idx > start_idx:
@@ -115,7 +114,7 @@ def map_spectrum_to_equalizer(magnitude, freq_bins, log_bins):
             bar_heights[i] = np.interp(
                 (log_bins[i] + log_bins[i + 1])
                 / 2,  # The center frequency of the interval
-                freq_bins,
+                spectrum,
                 magnitude,
             )
 
@@ -138,8 +137,7 @@ def get_spectrum_magnitude(waveform_data, chunk: int):
 def main() -> None:
     import matplotlib
     import matplotlib.pyplot as plt
-    from matplotlib import animation
-    import matplotlib.cm as cm
+    from matplotlib import animation, colormaps
 
     matplotlib.use("TkAgg")  # to display in separate Tk window
 
@@ -192,8 +190,8 @@ def main() -> None:
     ax3.set_ylim(0, config.bars_limit)
 
     # Assign colors to bars using a colormap
-    cmap = cm.get_cmap("rainbow", config.bars_num)
-    colors = [cmap(i) for i in reversed(range(config.bars_num))]
+    cmap = colormaps["rainbow"].resampled(config.bars_num)
+    colors = [cmap(i / (config.bars_num - 1)) for i in reversed(range(config.bars_num))]
     for bar, color in zip(equalizer_bar, colors):
         bar.set_color(color)
 
@@ -237,13 +235,13 @@ def main() -> None:
                 data = ",".join(map(str, np.flip(bar_heights))) + "\n"
                 ser.write(data.encode())
 
-            for bar, height in zip(equalizer_bar, bar_heights):
+            for bar, height in zip(equalizer_bar.patches, bar_heights):
                 bar.set_height(height)
 
             frame_count[0] += 1
 
             # Return the objects to update during animation
-            return waveform_line, spectrum_line, *equalizer_bar
+            return waveform_line, spectrum_line, *equalizer_bar.patches
 
         except TclError as e:
             print(f"TclError: {e}")
