@@ -56,9 +56,9 @@ class Config:
             return p, stream
 
         except Exception as e:
-            print(f"Error opening audio stream: {e}")
             p.terminate()
-            exit()
+            print(f"Error opening audio stream: {e}")
+            raise
 
     def serial_connection(
         self, serial_port: str = None, baud_rate: int = None, timeout: int = 1
@@ -74,14 +74,12 @@ class Config:
         try:
             ser = serial.Serial(serial_port, baud_rate, timeout=timeout)
             print(f"Connected with {serial_port}")
+            return ser
 
         except serial.SerialException as e:
             print(f"Connection error: {e}")
         except KeyboardInterrupt:
             print("User interrupt.")
-
-        finally:
-            return ser
 
 
 def normalize_equalizer(input, input_limit, result_limit):
@@ -89,15 +87,14 @@ def normalize_equalizer(input, input_limit, result_limit):
     Normalize bar heights to the range [0, limit_bars], scaling by amplitude_limit.
     Values are rounded up to the nearest integer.
     """
-    from copy import copy
     from math import ceil
 
-    result = copy(input)
+    result = input.copy()
     for i, value in enumerate(result):
-        if result[i] < 1:
-            result[i] = value * result_limit / input_limit
-        else:
-            result[i] = ceil(value * result_limit / input_limit)
+        value = value * result_limit / input_limit
+        if value > 1:
+            value = ceil(value)
+        result[i] = int(value)
     return result
 
 
@@ -237,7 +234,7 @@ def main() -> None:
 
             if ser:
                 # Map values to INT and flip data
-                data = ",".join(map(str, map(int, np.flip(bar_heights)))) + "\n"
+                data = ",".join(map(str, np.flip(bar_heights))) + "\n"
                 ser.write(data.encode())
 
             for bar, height in zip(equalizer_bar, bar_heights):
