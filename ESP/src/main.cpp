@@ -6,24 +6,24 @@
           S E T U P
 ***************************/
 
+// __________LEDS___________
 #define INITIAL_LED_TEST_ENABLED true
-#define INITIAL_LED_TEST_BRIGHTNESS 100 // 0..255
-#define INITIAL_LED_TEST_TIME_MS 100    // 10..
-#define INITIAL_LED_TEST_BLINKS 1       // 1..
+#define INITIAL_LED_TEST_BRIGHTNESS 100 // 0-255
+#define INITIAL_LED_TEST_TIME_MS 100    // 10-
+#define INITIAL_LED_TEST_BLINKS 1       // 1-
 
-#define NUM_LEDS 144 // Liczba diod LED
-
-// type of your led controller, possible values, see below
+#define NUM_LEDS 144 // Number of LEDs
 #define LED_TYPE NEO_GRBW
 #define LED_FREQUENCY NEO_KHZ800
-
 #define LED_PINS 12    // 3 wire leds
 #define BRIGHTNESS 255 // maximum brightness 0-255
 
-#define BAUD_RATE 115200 // Prędkość transmisji szeregowej
+#define BAUD_RATE 115200 // Serial transmission speed
 
 // Define the array of leds
 Adafruit_NeoPixel leds(NUM_LEDS, LED_PINS, LED_TYPE + LED_FREQUENCY);
+
+// _______Bluetooth________
 BluetoothSerial SerialBT; // Obiekt Bluetooth Serial
 
 // set color to all leds
