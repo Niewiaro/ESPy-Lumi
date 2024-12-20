@@ -1,6 +1,28 @@
 from fft import *
 
 
+def get_synthetic_waveform(
+    frequency: float, amplitude: int, duration: float, chunk: int, rate: int = 44100
+) -> np.ndarray:
+    """
+    Generate a synthetic waveform for testing purposes.
+
+    Args:
+        frequency (float): Frequency of the synthetic waveform in Hz.
+        amplitude (int): Amplitude of the waveform.
+        duration (float): Duration of the waveform in seconds.
+        chunk (int): Number of samples per frame.
+        rate (int): Sampling rate in Hz (default is 44100).
+
+    Returns:
+        np.ndarray: Array of synthetic waveform samples of length `chunk`.
+    """
+    t = np.linspace(0, duration, int(rate * duration), endpoint=False)  # Time axis
+    waveform = amplitude * np.sin(2 * np.pi * frequency * t)  # Sine wave
+    waveform = waveform.astype(np.int16)  # Convert to 16-bit integer
+    return waveform[:chunk]  # Return only the requested chunk size
+
+
 def main() -> None:
     import matplotlib
     import matplotlib.pyplot as plt
@@ -13,9 +35,11 @@ def main() -> None:
 
     # Configuration
     config = Config()
-    p, stream = config.stream_audio()
-    # ser = config.serial_connection()
-    ser = None
+    # p, stream = config.stream_audio()
+    p = None
+    stream = None
+    ser = config.serial_connection()
+    # ser = None
 
     # Plot Setup
     fig, (ax1, ax2, ax3) = plt.subplots(3, figsize=(15, 10))
@@ -73,6 +97,18 @@ def main() -> None:
 
     # Counting FPS by mutable object
     frame_count = [0]
+    synthetic_waveform = get_synthetic_waveform(
+        frequency=2001,
+        amplitude=config.amplitude_limit / 4,
+        duration=1.0,
+        chunk=config.chunk,
+    )
+    synthetic_waveform += get_synthetic_waveform(
+        frequency=1009,
+        amplitude=config.amplitude_limit / 2,
+        duration=1.0,
+        chunk=config.chunk,
+    )
 
     def animate(i):
         """
@@ -82,7 +118,7 @@ def main() -> None:
         """
         try:
             # Read audio data
-            waveform_data = get_waveform(stream, config.chunk)
+            waveform_data = synthetic_waveform
 
             # Update waveform
             waveform_line.set_ydata(waveform_data)
