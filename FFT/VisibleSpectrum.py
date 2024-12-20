@@ -53,21 +53,34 @@ g_values = [c[1] for c in colors]
 b_values = [c[2] for c in colors]
 
 # Wykresy
-plt.figure(figsize=(10, 6))
+plt.figure(figsize=(15, 10))
 
 # Gradient widzialnego światła
 gradient = np.array(colors) / 255
-plt.imshow([gradient], extent=[380, 750, 0, 0.1], aspect='auto')
+plt.imshow([gradient], extent=[380, 750, 260, 300], aspect='auto', origin='lower')
 
 # Składowe RGB
-plt.plot(wavelengths, r_values, label="Red", color="red")
-plt.plot(wavelengths, g_values, label="Green", color="green")
-plt.plot(wavelengths, b_values, label="Blue", color="blue")
+plt.plot(wavelengths, r_values, label="Czerwona (Red)", color="red")
+plt.plot(wavelengths, g_values, label="Zielona (Green)", color="green")
+plt.plot(wavelengths, b_values, label="Niebieska (Blue)", color="blue")
+
+# Oznaczenia kluczowych długości fal
+key_wavelengths = [380, 440, 490, 510, 580, 645, 750]
+key_labels = ['Fiolet (380 nm)', 'Niebieski (440 nm)', 'Cyjan (490 nm)', 'Zielony (510 nm)', 
+              'Żółty (580 nm)', 'Czerwony (645 nm)', 'Czerwony (750 nm)']
+for w, label in zip(key_wavelengths, key_labels):
+    plt.axvline(x=w, color='gray', linestyle='--', alpha=0.5)
+    plt.text(w, 10, label, rotation=90, verticalalignment='bottom', horizontalalignment='right', fontsize=10)
 
 # Ustawienia wykresu
-plt.title("Mieszanie kolorów w spektrum widzialnym")
-plt.xlabel("Długość fali (nm)")
-plt.ylabel("Intensywność składowych RGB")
-plt.legend()
-plt.grid(True)
+plt.title("Mieszanie kolorów w spektrum widzialnym", fontsize=14)
+plt.xlabel("Długość fali (nm)", fontsize=12)
+plt.ylabel("Intensywność składowych RGB [0-255]", fontsize=12)
+plt.ylim(0, 299)
+plt.xlim(380, 750)
+plt.legend(fontsize=10, loc='center right')
+plt.grid(True, linestyle='--', alpha=0.3)
+
+# Wyświetlenie wykresu
+plt.tight_layout()
 plt.show()
