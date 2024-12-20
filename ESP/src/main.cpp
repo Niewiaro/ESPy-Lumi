@@ -2,8 +2,9 @@
 #include <Adafruit_NeoPixel.h>
 #include <BluetoothSerial.h>
 
+
 /***************************
-          S E T U P
+         S E T U P
 ***************************/
 
 // __________LEDS___________
@@ -24,7 +25,12 @@
 Adafruit_NeoPixel leds(NUM_LEDS, LED_PINS, LED_TYPE + LED_FREQUENCY);
 
 // _______Bluetooth________
-BluetoothSerial SerialBT; // Obiekt Bluetooth Serial
+BluetoothSerial SerialBT;
+
+
+/***************************
+          C O D E
+***************************/
 
 // set color to all leds
 void showColor(uint8_t r = 0, uint8_t g = 0, uint8_t b = 0, uint8_t w = 0)
@@ -38,7 +44,7 @@ void showColor(uint8_t r = 0, uint8_t g = 0, uint8_t b = 0, uint8_t w = 0)
 #endif
 }
 
-// Funkcja generująca kolory tęczy dla danego indeksu LED
+// rainbow
 uint32_t Wheel(byte WheelPos)
 {
     WheelPos = 255 - WheelPos;
@@ -55,12 +61,13 @@ uint32_t Wheel(byte WheelPos)
     return leds.Color(WheelPos * 3, 255 - WheelPos * 3, 0); // Green -> Red
 }
 
+// light visible spectrum rainbow
 uint32_t VisibleSpectrum(int index, int totalLEDs)
 {
-    float position = (float)index / (float)totalLEDs;  // Normalizacja pozycji 0–1
-    float wavelength = 380 + (position * (750 - 380)); // Przeskalowanie na długości fali 380–750 nm
+    float position = (float)index / (float)totalLEDs;  // normalize 0–1
+    float wavelength = 380 + (position * (750 - 380)); // scale to wavelength 380–750 nm
 
-    // Konwersja długości fali na RGB (przybliżenie spektrum)
+    // wavelength to RGB (aproxyamt spectrum)
     float r, g, b;
     if (wavelength >= 380 && wavelength < 440)
     {
@@ -102,10 +109,9 @@ uint32_t VisibleSpectrum(int index, int totalLEDs)
     {
         r = 0.0;
         g = 0.0;
-        b = 0.0; // Poza zakresem widzialnym
+        b = 0.0; // out of spectrum range
     }
 
-    // Dostosowanie intensywności dla widzialnego spektrum
     float intensity;
     if (wavelength >= 380 && wavelength < 420)
     {
@@ -130,12 +136,9 @@ uint32_t VisibleSpectrum(int index, int totalLEDs)
 // main function that setups and runs the code
 void setup()
 {
-    // Inicjalizacja Serial i LED
     Serial.begin(BAUD_RATE);
-
-    // Inicjalizacja Bluetooth
     if (!SerialBT.begin("ESP32_LED_Control"))
-    { // Nazwa urządzenia
+    {
         Serial.println("Bluetooth initialization failed!");
         while (true)
             ;
@@ -145,9 +148,6 @@ void setup()
     leds.begin();
     leds.clear();
     leds.show();
-    // Serial.println("ESP32 LED Controller Ready.");
-
-    // color adjustments
     leds.setBrightness(BRIGHTNESS);
 
 // initial RGB flash
@@ -186,19 +186,14 @@ void setup()
 
 void loop()
 {
-    // Sprawdź, czy są dostępne dane na Serial
-    // if (Serial.available()) {
     if (SerialBT.available())
     {
-        // Odbierz całą linię danych
-        // String receivedData = Serial.readStringUntil('\n');
-        // Odczyt danych przez Bluetooth
-        String receivedData = SerialBT.readStringUntil('\n');
-        receivedData.trim(); // Usuń białe znaki
+        String receivedData = SerialBT.readStringUntil('\n'); // read BT data
+        receivedData.trim(); // remove white space
+
         Serial.println(receivedData);
         Serial.println(receivedData.length());
 
-        // Podziel dane na wartości oddzielone przecinkami
         int intensities[NUM_LEDS];
         int index = 0;
         int start = 0;
@@ -213,27 +208,24 @@ void loop()
             }
         }
 
-        // Sprawdź, czy liczba wartości jest zgodna z liczbą LED
+        // rainbow
         // if (index == NUM_LEDS) {
         //     for (int i = 0; i < NUM_LEDS; i++) {
-        //         // Oblicz statyczny kolor tęczy dla danego indeksu
         //         uint32_t color = Wheel((i * 256 / NUM_LEDS) % 256);
 
-        //         // Wyciągnij składowe RGB
         //         uint8_t r = (color >> 16) & 0xFF;
         //         uint8_t g = (color >> 8) & 0xFF;
         //         uint8_t b = color & 0xFF;
 
-        //         // Dostosuj intensywność
         //         r = (r * intensities[i]) / 255;
         //         g = (g * intensities[i]) / 255;
         //         b = (b * intensities[i]) / 255;
 
-        //         // Ustaw kolor dla LED
         //         leds.setPixelColor(i, leds.Color(r, g, b));
         //     }
         //     leds.show();
-        //     Serial.println("Kolory LED zaktualizowane.");
+
+        // visible spectrum rainbow
         if (index == NUM_LEDS)
         {
             for (int i = 0; i < NUM_LEDS; i++)
@@ -251,18 +243,13 @@ void loop()
                 leds.setPixelColor(i, leds.Color(r, g, b));
             }
             leds.show();
-            Serial.println("Kolory LED zaktualizowane zgodnie z widzialnym spektrum.");
+            Serial.println("Colors of LEDs updated.");
         }
         else
         {
-            Serial.println("Nieprawidłowa liczba wartości.");
+            Serial.println("ERROR: Invalid data.");
         }
 
-        // Czyszczenie bufora RX po odczytaniu danych
-        while (SerialBT.available())
-        {
-            SerialBT.read(); // Odczytaj i odrzuć pozostałe dane
-        }
-        SerialBT.flush(); // Wyczyść bufor
+        SerialBT.flush(); // clear RX buffer after data read
     }
 }
