@@ -230,7 +230,7 @@ def main() -> None:
                 bar_heights, config.amplitude_limit, config.bars_limit
             )
 
-            if ser:
+            if ser is not None:
                 # Map values to INT and flip data
                 data = ",".join(map(str, np.flip(bar_heights))) + "\n"
                 ser.write(data.encode())
