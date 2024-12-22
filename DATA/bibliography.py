@@ -44,7 +44,10 @@ Graf M., Opara H.C., Barthet M., An Audio-Driven System For Real-Time Music Visu
 """
 
 def main() -> None:
-    print("bibliography")
+    books = DATA.splitlines()
+    books = list(filter(('').__ne__, books))
+    books = sorted(books)
+    print(books)
 
 if __name__ == "__main__":
     main()
