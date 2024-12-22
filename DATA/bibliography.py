@@ -5,9 +5,7 @@ Piecuch A., PROGRAMOWANIE MOŻE BYĆ INTERESUJĄCE – PLATFORMA ARDUINO, Dydakt
 Nano V3.0 z USB mini zgodny z Arduino®, sklep.msalamon.pl, 2024-12-09
 Nano, docs.arduino.cc, 2024-12-09
 
-4.2.2. ESP32 important features
-El-Khozondar H.J., Mtair S.Y. Qoffa K.O., Qasem O.I., Munyarawi A.H., Nassar Y.F. et al., A smart energy monitoring system using ESP32 microcontroller, e-Prime - Advances in Electrical
-Engineering, Electronics and Energy, 2024
+El-Khozondar H.J., Mtair S.Y. Qoffa K.O., Qasem O.I., Munyarawi A.H., Nassar Y.F. et al., A smart energy monitoring system using ESP32 microcontroller, e-Prime - Advances in Electrical Engineering, Electronics and Energy, 2024
 ESP32-DevKitC-VIE, www.mouser.pl, 2024-12-09
 
 ESP32-DevKitC V4, docs.espressif.com, 2024-12-09
@@ -30,7 +28,7 @@ Kłopotowska A., Architektura a dźwięk  – interdyscyplinarne badania naukowe
 Graf M., Opara H.C., Barthet M., An Audio-Driven System For Real-Time Music Visualisation, Queen Mary University of London, 2021 maj
 ,, Cyfrowe przetwarzanie sygnałów w praktycznych zastosowaniach (2)”, ep.com.pl, 2024-12-21
 
-,, Rozwój oprogramowania audio dla systemów embedded”, sii.pl, 2024-12-21
+,,Rozwój oprogramowania audio dla systemów embedded”, sii.pl, 2024-12-21
 ,,Fast, easy LED library for Arduino”, fastled.io, 2024-12-21
 
 ,,Adafruit NeoPixel Überguide”, learn.adafruit.com, 2024-12-21
@@ -39,15 +37,21 @@ Graf M., Opara H.C., Barthet M., An Audio-Driven System For Real-Time Music Visu
 
 ,,Welcome to LedFx”, github.com/LedFx, 2024-12-22
 
-,, Audio Reactive LED Strip”, github.com/scottlawsonbc, 2024-12-21
+,,Audio Reactive LED Strip”, github.com/scottlawsonbc, 2024-12-21
 
 """
+
+def fix_str(item: str) ->str:
+    return item.replace(",, ", '').replace(",,", '')
 
 def main() -> None:
     books = DATA.splitlines()
     books = list(filter(('').__ne__, books))
+    books = [fix_str(book) for book in books]
     books = sorted(books)
-    print(books)
+
+    for i, book in enumerate(books):
+        print(f"{i+1}.\t{book}")
 
 if __name__ == "__main__":
     main()
