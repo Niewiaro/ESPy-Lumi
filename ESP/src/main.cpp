@@ -191,7 +191,9 @@ void loop()
         String receivedData = SerialBT.readStringUntil('\n'); // read BT data
         receivedData.trim(); // remove white space
 
+        Serial.print("CSV:\n");
         Serial.println(receivedData);
+        Serial.print("CSV length:\n");
         Serial.println(receivedData.length());
 
         int intensities[NUM_LEDS];
