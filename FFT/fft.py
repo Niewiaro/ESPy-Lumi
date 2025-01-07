@@ -94,7 +94,8 @@ def normalize_equalizer(input, input_limit, result_limit):
         value = value * result_limit / input_limit
         if value > 1:  # reduce noise
             value = ceil(value)
-        result[i] = int(value)
+        result[i] = value
+    result = result.astype(np.int64)
     return result
 
 
@@ -147,8 +148,8 @@ def main() -> None:
     # Configuration
     config = Config()
     p, stream = config.stream_audio()
-    # ser = config.serial_connection()
-    ser = None
+    ser = config.serial_connection()
+    # ser = None
 
     # Plot Setup
     fig, (ax1, ax2, ax3) = plt.subplots(3, figsize=(15, 10))
